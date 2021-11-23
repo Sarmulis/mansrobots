@@ -1,0 +1,383 @@
+
+Getting Started with the
+HM-10 BLE Module
+Working with the HM-10 BLE Module using UART
+Jarrod Smith
+Department of Electrical and Computer Engineering
+California State University, Fresno
+NSF Bulldog Mote Team
+Contents
+1 HM-10 BLE Module Serial Communication 3
+1.1 Overview . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3
+1.2 HM-10 Module Configuration . . . . . . . . . . . . . . . . . . . . . . . . . . 9
+1.3 Connecting Two HM-10 Devices . . . . . . . . . . . . . . . . . . . . . . . . . 10
+1.3.1 Setting up Slave Device . . . . . . . . . . . . . . . . . . . . . . . . . 11
+1.3.2 Setting up Master Device . . . . . . . . . . . . . . . . . . . . . . . . 11
+1.3.3 Discovery Connection . . . . . . . . . . . . . . . . . . . . . . . . . . . 12
+1.4 Connecting to HM-10 from Android Phone . . . . . . . . . . . . . . . . . . . 16
+1
+List of Figures
+1 HM-10 Module from DSD Tech . . . . . . . . . . . . . . . . . . . . . . . . . 3
+2 HM-10 Pins . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3
+3 SH-U09F FTDI Module . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+4 UART Communication Configuration . . . . . . . . . . . . . . . . . . . . . . 5
+5 Selecting Device Manager from the Start Menu . . . . . . . . . . . . . . . . 6
+6 Device Manager . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+7 Realterm: Serial Monitor when it first starts. . . . . . . . . . . . . . . . . . . 8
+8 Realterm Port Settings for FTDI Device. . . . . . . . . . . . . . . . . . . . . 8
+9 Successful FTDI Communication in Realterm. . . . . . . . . . . . . . . . . . 9
+10 Master Discovery Readings. . . . . . . . . . . . . . . . . . . . . . . . . . . . 12
+11 Master (Bulldogs2) and Slave (Bulldogs) Devices Connected. . . . . . . . . . 13
+12 Master and Slave Sending Strings. . . . . . . . . . . . . . . . . . . . . . . . . 14
+13 Master Connecting to Slave Based on MAC Address. . . . . . . . . . . . . . 15
+14 Bluetooth Adapter Disabled. . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+15 Scanning for BLE Devices. . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18
+16 HM-10 Services. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19
+17 HM-10 ESS Characteristics. . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
+18 Sending Temperature Data. . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+19 Temperature Reading in nRF Connect. . . . . . . . . . . . . . . . . . . . . . 22
+2
+1 HM-10 BLE Module Serial Communication
+Figure 1: HM-10 Module from DSD Tech
+The HM-10 Module is a Bluetooth 4.0 Module that includes Bluetooth Low Energy (BLE).
+This module transmits over the 2.4 GHz ISM band like traditional Bluetooth, however BLE
+uses considerably less power while still maintaining its effective communication range. This
+makes BLE a viable option for IoT communication between devices.
+1.1 Overview
+The BLE device communicates with a host microcontroller using UART. Depending on the
+supplier the device is purchased through will determine the number of pins. For this tutorial,
+the four middle pins will be used: RXD, TXD, GND and VDD.
+Figure 2: HM-10 Pins
+3
+The commands to control this device have to be understood before it is plugged into a
+microcontroller. To do this, an FTDI module can be used to connect the UART pins of
+the HM-10 directly to a computer. There, a serial connection can be established with the
+module and will give the user an easier time testing and debugging commands.
+Any FTDI module will work, but be sure to purchase one with a genuine FTDI chip.
+Most computers have firmware installed already that will make these devices plug-and-play
+ready. However if the FTDI chip is not a genuine one, the modern firmware will be able to
+tell and “.*” the counterfeit chip, rendering it unusable.
+The FTDI component used here is the SH-U09F, produced by DSD Tech as well.
+Figure 3: SH-U09F FTDI Module
+The current drivers should be downloaded and installed before plugging the FTDI component
+into the computer. The current FTDI drivers can be found at http://www.ftdichip.com/
+Drivers/VCP.htm. There you can select the correct firmware for your operating system.
+Once installed plug the device into your computer. The SH-U09F module here uses a micro
+USB cable to connect to the host computer.
+After the computer finishes configuring the FTDI module, unplug the device. Next the
+FTDI module will be connected to the BLE module. The HC-10 device uses 3.3 V logic and
+power, so on the SH-U09F module the jumper between the 5V0 pin and JP pin should be
+changed to connect the 3V3 and JP pins instead. This changes the logic and VCC voltages
+to 3.3 V. Next, the pins of the devices can be connected with jumper wire. The following
+diagram should be followed:
+4
+Figure 4: UART Communication Configuration
+In UART communication, the receive line (Rx) on one device is connected to the transmit
+(Tx) of the other, and visa-versa. VCC and GND should also be connected.
+Once connected a serial communication program can be used to send and receive data
+from the user’s computer to the end device on the other end of the FTDI module. The
+program used here to send and receive the UART data is Realterm: Serial Terminal:
+https://realterm.sourceforge.io/index.html#downloads_Download. Go to the link
+and click the download link at the top of the page to get the install executable.
+Once installed and opened, the program will connect automatically to a device with a
+COM port. So plug in the FTDI module again, then open the Device Manager by clicking
+the Start menu, then type Device Manager in the Search text box. Open the Device Manager
+once it pops up.
+5
+Figure 5: Selecting Device Manager from the Start Menu
+Once opened, go to the Ports list to identify the COM number of the FTDI module. In
+this case it is COM11.
+6
+Figure 6: Device Manager
+If there are many devices connected and it is difficult to tell which is the correct one,
+then right click on one of them at a time a go to Properties. Under Manufacturer should
+be FTDI for the correct module.
+7
+Figure 7: Realterm: Serial Monitor when it first starts.
+The first tab displayed in Realterm is just how the serial information is displayed. Leave
+the Display As option as ASCII. Next, under the Port tab, select the correct port number
+for the FTDI device and a Baud of 9600. Then click on the Open button to connect to the
+module
+Figure 8: Realterm Port Settings for FTDI Device.
+The FTDI device will now be ready to talk to. To start, click on the Send tab. There will
+8
+be two identical lines with a text input and buttons reading Send Numbers and Send ASCII.
+Either of the two lines can be used to send data. There will be cases where you’ll want to
+send raw binary/hexadecimal data to the device where the Send Numbers will be useful.
+But for configuring the FTDI module ASCII encoded characters are what we need. Also, to
+have responses on separate lines, click the After check box in the \n section. Otherwise all
+the FTDI responses will run on the same line.
+Now the connection can be tested. In the text box type “AT” (without quotes) and
+click Send ASCII. If the connection is successful there should be a response of “OK” in the
+window.
+Figure 9: Successful FTDI Communication in Realterm.
+1.2 HM-10 Module Configuration
+Some default settings in the HM-10 module need to be changed after the module is wired
+up and communication is verified in Realterm.
+While in Realterm, type: “AT+IMME?”. If the response is “OK+Get:0”, then type
+“AT+IMME1” to change the settings. This setting is used to tell the module to start
+in command mode or work mode when the device starts up. In command mode (changed
+by sending “AT+IMME1”), the component will only perform what the user asks based on
+the AT commands. In work mode (“AT+IMME1”), the device will automatically perform
+actions like connecting to neighboring devices, enabling discovery, etc. based on its current
+settings on start up.
+Next, we’ll want to see what message the device can display, so the next command
+will turn on notifications: “AT+NOTI1”. Then, type “AT+NOTP1” to show MAC
+9
+addresses related to the notification.
+The HM-10 device likely has a default name (not the same as the MAC address). So
+give the device a unique name by typing “AT+NAME[name]” where “[name]” is a
+string. For example, if you want to name the device Bulldogs, then the command would
+be “AT+NAMEBulldogs”.
+Next, all Bluetooth Low Energy devices use some UUID value to identify what type
+of information to expect in a standardized manner. To change the UUID value sent the
+command: “AT+UUID[uuid]” where “[uuid]” is a valid UUID value in hexadecimal with
+a hexadecimal prefix. For example, if you wanted to use UUID value 0x181A, which is the
+Bluetooth assigned number for the Environment Sensing service. For more information on
+the Bluetooth protocol, read the Bulldog BLE Handbook (coming soon).
+Similarly, the service characteristic value can also be set on the HM-10. Under Environmental
+Sensing Service there are several characteristics, one of which is Temperature with a UUID
+of 0x2A6E. Use the command “AT+CHAR[char]” where “[char]” is the UUID value of
+the characteristic to set the device’s characteristic.
+While the device is connected to another Bluetooth device, no AT-commands will be
+valid until the connection is broken. This can be done manually by simply typing “AT”.
+The module should return “OK+LOST” when successfully disconnected. This step should
+not be necessary if AT+TCON and AT+IMME are set.
+1.3 Connecting Two HM-10 Devices
+Two HM-10 devices can be connected together once the settings listed previously are changed.
+Actually the devices could be connected prior to running those commands, but to save a
+head-ache or two its advisable to run them first.
+Multiple instances of Realterm can be run on the same computer so this process can
+be completed on a single computer with two HM-10 devices connected to it. Whether you
+decide to connect the other HM-10 to the same computer or not, perform the same steps
+in the Overview and HM-10 Module Configuration sections of this document to set up the
+second FTDI and HM-10 device separately.
+Once both devices are setup and connected to the computer, then they can be paired
+and bonded. To do so takes a few steps.
+First, one device must be selected as the master and the other the slave device. In
+Bluetooth Point-to-Point protocols, the slave device is the one with data from sensor readings
+and the master device is the one that connected to the slave to gather that data.
+To set the master/slave roles for each device use the command “AT+ROLE”.
+10
+1.3.1 Setting up Slave Device
+To change the role of the module to a slave use the command: “AT+ROLE0”. Doing
+this starts the module advertising its presence to BLE master devices. As a note, some
+datasheets call the slave device the Peripheral Node.
+Next, to change the interval in which the slave sends an advertisement use the command:
+“AT+ADVI[P1]”, where [P1] is a value 0 through F and represents different time intervals
+in Table 1:
+[P1] Advertising Interval (ms) [P1] Advertising Interval (ms)
+0 100 8 1022.5
+1 152.5 9 1285
+2 211.25 A 2000
+3 318.75 B 3000
+4 417.5 C 4000
+5 546.25 D 5000
+6 760 E 6000
+7 852.5 F 7000
+Table 1: ADVI Values
+The default value of 1285 ms is fine for our purposes.
+Also to keep in mind, there are different advertising types under the “AT+ADTY”
+command. The default allows advertising, scanning response and makes the device openly
+connectable. To set the device back to its default type use: “AT+ADTY0”.
+Lastly, some device wont advertise unless the advertising data flag is set. To do this the
+AT+FLAG command is used. Type “AT+FLAG0” and click Send ASCII. This command
+can use values from 0 through FF, however using any value will get the device to advertise.
+Now the slave device is advertising its presence and ready to be connected to.
+1.3.2 Setting up Master Device
+Setting up the master is a little simpler than the slave device. The command to set the device
+to master is “AT+ROLE1”. The master is also called the Central Node in some datasheets.
+Once set the device can immediately begin scanning for slave devices. Type “AT+DISC?”
+to do so. If the slave is configured correctly the terminal for the master should read:
+“OK+DISCS” (starting discovery), then “OK+DIS0:[MACADDR]” (where [MACADDR]
+is the MAC address of the slave module), and finally “OK+DISCE” (for ending discovery
+process). Likely all of these messages will be on the same line.
+11
+If there were multiple BLE slave devices available and in range there will be a “OK+DIS1:[MACADDR]”.
+The important thing here is the value after OK+DIS. This value represents the array index
+of the connectable BLE devices. So it will be important to know the MAC address of the
+slave HM-10 module to identify which device the master should connect to.
+Figure 10: Master Discovery Readings.
+1.3.3 Discovery Connection
+From Figure 10, the slave device is identified by “OK+DIS0:90E2028CFE6E” meaning
+that the device with MAC address 90:E2:02:8C:FE:6E can be connected to using index 0. So
+now the master can connect to this discovery device using the command “AT+CONN[DISC]”
+where [DISC] is the array index. So in the case of Figure 10 the command would be
+“AT+CONN0”. Doing this connects to the slave device and shows in both devices
+terminals that they are connected to each others MAC addresses.
+12
+Figure 11: Master (Bulldogs2) and Slave (Bulldogs) Devices Connected.
+Now simple strings or numbers can be transmitted from slave to master and visa-versa.
+In transmit mode, none of the AT commands will be recognized except the “AT” command,
+which disconnects both devices.
+Note: Once the slave device is disconnected the advertising flag needs to be set again before it can
+be discovered.
+13
+Figure 12: Master and Slave Sending Strings.
+When connecting to a device its sometimes more desirable to connected to a device based
+on its MAC address instead of discovery array index. The command “AT+CON[MACADDR]”
+can be used to so this from the master. The discovery command should still be run first to
+know if the slave device is available to be connected to first.
+14
+Figure 13: Master Connecting to Slave Based on MAC Address.
+15
+1.4 Connecting to HM-10 from Android Phone
+In the last part, two HM-10 devices were connected, one being the master and the other the
+slave. In this part, one HM-10 module will be used as a slave device and a smart phone
+will be used as the master device. This part completely depends on the capabilities of your
+smart phone. Make sure your phone has BLE capabilities to be able to do this.
+If the phone does have BLE capabilities, the nRF Connect can be downloaded from the
+Google Play Store. nRF Connect is an app by Nordic Semiconductor used to connect and
+communication to any BLE device.
+First however, one of the HM-10 modules should be set up as a slave device as shown
+in the last section. In addition, the UUID for the slave device’s service and characteristic
+should be configured as described in the HM-10 Module Configuration. Make sure to reset
+the module after making changes to apply them using the “AT+RESET” command.
+Once the slave device is set up and advertising its presence, the Android device can detect
+and connect to it. To do so, install and open the nRF Connect app. If the Bluetooth adapter
+is disabled it there will be a red bar instructing you to enable it.
+16
+Figure 14: Bluetooth Adapter Disabled.
+Once enabled, click the Scan button on the top right. After a moment, the HM-10 device
+should show up with its name.
+17
+Figure 15: Scanning for BLE Devices.
+Click on the Connect button on the HM-10 device. Doing this will open a new tab will
+open with the name of the module. In this tab there are three main services, two generic
+services and one Environmental Sensing. Click on the Environmental Sensing service. If the
+UUIDs were set up correctly, the values used in the configuration were for the Bluetooth
+Environment Sensing Service (ESS) and Temperature Characteristic within the ESS.
+18
+Figure 16: HM-10 Services.
+19
+Figure 17: HM-10 ESS Characteristics.
+However, there is no data for the temperature reading yet. We don’t have an actual
+temperature sensor connected to the BLE module, so we’ll have to fake it for now.
+The temperature value can be transmitted from Realterm in the form of raw hexadecimal
+values. Bluetooth gives specifications for formatting data for all characteristics. The ESS
+Specification for the Temperature Characteristic allows a degree resolution down to 0.01◦C.
+Also, the data type of the value is an sint16, or 16-bit signed-integer. To fix the decimal
+point problem that would be lost in using a integer the temperature value needs to be
+multiplied by 102 before being converted into signed-integer. So a temperature reading
+of 34.56◦C would be 3456 and 0x0D80 in hexadecimal. Also, signed-integers used Two’s
+Compliment to represent negative values. Thus, a temperature reading of -10.35◦C would
+be multiplied by 102 and converted to Two’s Compliment to get a result of 0xFBF5.
+So lets use the temperature value of 34.56◦C to send to the Android device connected to
+the HM-10. In Realterm we can send these values in their signed-integer, hexadecimal form
+20
+Pin Configuration Details
+VCC
+To power input of the module, the VCC pin connects to the positive terminal of the power.
+GND
+The ground pin is always important for every DC circuit to make the common ground with power and other devices for proper function. GND pin will help to fulfill the requirement.
+
+RX
+HC10 communicates follows the UART communication protocol for data sending and receiving.  RX will help to receiver the data from Arduino/microcontroller.
+TX
+TX will send the data from the Bluetooth to the Arduino/microcontroller.
+
+State
+This pin is just for state representation. There will a HIGH output signal at state pin for established Bluetooth connection otherwise it will be at a low.
+BRK
+BRK represents the break, which helps to disconnect the connection of Bluetooth with another module. To disconnect the connect apply the LOW input signal on it.
+Button
+There is a button on the device to break the connection just like a BRK pin.
+LED
+The onboard led is for visualization. This helps to understand the current situation of the Bluetooth device.
+
+HM-10 BT Module Features
+HM-10 has the latest 4.0 Bluetooth technology.
+There is no limit in sending bytes with HM-10.
+Power consumption is much less even in an operating state with this module.
+The HC10 module uses the 2.5GHz frequency band at the range of 100meter in an open area.
+It is useable as a Master or Slave just by disconnecting the connections.
+The module operates at 2-3.7V only which is common in every TTL/CMOS device.
+A single module has its 256Kb flash memory and 8Kb SRAM.
+There are onboard GPIO pins within the module which are usable through UART communications,
+The GFSK (Gaussian Frequency Shift Keying) helps to transfer the data for the module.
+The device offers data and command mode which helps to set the internal setting according to the project requirement.
+HM-10 Bluetooth Module Applications
+Every commercial device like headphones and mice are now using HM-10 because of its low power consumption.
+Most of the laptops also have 4.0 Bluetooth.
+In IoT continuous data sending devices also have HM-10 because of its no limit feature.
+Every two ways communication device like robots, remote control cars uses the HM-10 at developing level.
+How To use HM-10
+The use of HM-10 is much easier just like other modules. The module is useable directly with serial communication but it sometimes faces the issue during communication. It’s better to use the libraries with digital pins to avoid problems. by using external libraries, the programming may become complex for some developers. The module HM-10 mostly helps with Arduino because there’s a lot of work done on the module with this board. To use the HM-10 the following library is helping to communicate.
+During using the HM-10 the board may sometimes need to use the serial communication which can affect the Bluetooth. To avoid any kind of interruption digital pins can communicate with the Bluetooth with the use of this library. The device can act both slave and master but both modes have some instructions to operate.
+
+HM-10 Bluetooth Module interfacing with Arduino nano
+To use the Digital pins of the Arduino with HM-10 the following connection needs to establish.
+
+#include <AltSoftSerial.h>
+
+AltSoftSerial bluetoothSerial;
+
+boolean NL = true;
+
+void setup() {
+
+Serial.begin(9600);
+
+while (!Serial) ;
+
+bluetoothSerial.begin(9600);
+
+}
+
+
+
+
+void loop() {
+
+char Serialdata;
+
+
+
+
+if (Serial.available()) {
+
+Serialdata = Serial.read();
+
+bluetoothSerial.print(Serialdata);
+
+
+
+
+if (Serialdata!=10 & Serialdata!=13 )
+
+{
+
+bluetoothSerial.write(Serialdata);
+
+}
+
+if (NL) { Serial.print("\r\n>"); NL = false; }
+
+Serial.write(Serialdata);
+
+if (Serialdata==10) { NL = true; }
+
+}
+
+if (bluetoothSerial.available()) {
+
+Serialdata = bluetoothSerial.read();
+
+Serial.print(Serialdata);
+
+}
+
+}
+The code is for communication between Arduino and Bluetooth. The code will help to communicate with Bluetooth whenever it is busy. By this method, the data mode and command mode is accessible by using the same code.
+
+HM-10 Command and Data Mode
+The device will act as a data and command mode but it will need to follow some procedure to go into its command mode. In command mode, the device is changeable from slave to master. First open the Arduino com port then break the connection between the HC10 and another Bluetooth device, which can be done by three methods.
+
+Button on the board
+By applying High input at BRK pin
+By restarting the device.
+After connection break, the device will connect again and it is identifiable from com port. Now enter the command:
+
+AT
+
+Then an “ok” message will appear which will verify the connection.
