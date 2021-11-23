@@ -1,0 +1,418 @@
+/*
+ * chip: mega328p
+ * Created: 4/21/2016 6:13:50 PM
+ *  Author: Brad Steffy
+ 
+ A4 SDA
+ A5 SCL
+ 
+ current is measured on + side of battery.
+ because -d and -c are seperate BMS connections and +B is shared.
+ 
+ might add bluetooth support for data upload, but usb serial is option.
+ and there's only one serial port, so it might be messy to do anyway.
+
+ @ 42.9 v motor cuts on/off 21AH
+ MAXI = 33.44 @ 24A cutoff
+ */ 
+
+#include <avr/sleep.h>  // library so it can use various sleep states
+#include <EEPROM.h>
+#include <Arduino.h>
+#include <Wire.h>
+#include <U8glib.h>
+U8GLIB_SSD1306_128X64 u8g(U8G_I2C_OPT_NONE);  // I2C / TWI
+
+//persistent storage = 1024 bytes
+void write_uint16_eeprom(uint16_t v, uint16_t addr){
+  /*uint8_t lowValue = v & 0xFF;
+  uint8_t highValue = (v & 0xFF00) >> 8;
+  EEPROM.write(addr, lowValue);
+  EEPROM.write(addr+1, highValue);*/
+  eeprom_read_block(&v, &addr, sizeof(v));
+}
+uint16_t read_uint16_eeprom(uint16_t addr){
+  /*uint16_t v = EEPROM.read(addr);
+  v += EEPROM.read(addr+1) << 8;
+  return v;*/
+  uint16_t v;
+  eeprom_read_block(&v, &addr, sizeof(v));
+  return v;  
+}
+void write_float_eeprom(float v, uint16_t addr){
+  eeprom_write_block(&v, &addr, sizeof(v));
+}
+float read_float_eeprom(uint16_t addr){
+  float v;
+  eeprom_read_block(&v, &addr, sizeof(v));
+  return v;
+}
+void write_double_eeprom(double v, uint16_t addr){
+  eeprom_write_block(&v, &addr, sizeof(v));
+}
+double read_double_eeprom(uint16_t addr){
+  double v;
+  eeprom_read_block(&v, &addr, sizeof(v));
+  return v;
+}
+
+//*************************************** code convertes flashing led "STATE" pin to connected boolean value **********************
+boolean isBtConnected = false;
+boolean lastState = false;
+boolean testingConnection = false;
+long timer = 0;
+void get_bt_connected(int pin){
+    lastState = digitalRead(pin);
+  //state pin = 2, same as connect led
+  if(lastState & !testingConnection){
+    //Serial.print("true");
+    //isConnected = true;
+    timer = millis();
+    testingConnection = true;
+    //Serial.println("testingConnection: ");
+  } else if(testingConnection & lastState & !isBtConnected){
+    //Serial.print("false");
+    //isConnected = false;
+    long diff = millis() - timer;
+    //Serial.println(diff);
+    if(diff > 650){
+      isBtConnected = true;
+      //Serial.println("isConnected");
+    }
+  } else if(!lastState & isBtConnected){
+    isBtConnected = false;
+    testingConnection = false;
+    //Serial.println("disConnected");
+  } else if(!lastState & !isBtConnected){
+    //
+    testingConnection = false;
+  }
+}
+
+
+/************************************* Packet receiving code ********************************
+ *  [len, data..., crc]
+ *  
+ *  len = len of data + crc byte + len byte
+ ********************************************************************************************/
+byte bufferLength = 10; //data_size + 2
+//byte write_buffer[] = {18,52,58,64,70,76,82,88,94,100,0,22,82,24,42,24,0,0};
+//byte read_buffer[] = {18,22,82,24,42,24,0,52,58,64,70,76,82,88,94,100,0,110};
+byte* read_buffer =  (byte *) malloc (sizeof (byte) * bufferLength);
+byte* write_buffer =  (byte *) malloc (sizeof (byte) * bufferLength);
+byte bufferOffset = 0;
+  // if there is a memory allocation error.
+  //if (buffer == NULL)
+  //  Log.Error("STACK: insufficient memory to initialize stack.");
+
+
+//as long as all bytes are the same sum this works, doesn't matter the order (bad thing?).
+byte calcSimpleCRC(byte* _buffer){
+  byte len = _buffer[0];
+  byte crc = 0;
+  long sum = 0;
+  for(int i=1;i<len-1;i++){
+    sum += _buffer[i];
+  }
+  //Serial.println(sum, DEC);
+  crc = sum % 256;
+  return crc;
+}
+
+//send packet back to HM10, calc CRC
+void writeBuffer(){
+  byte len = write_buffer[0];
+  write_buffer[len-1] = calcSimpleCRC(write_buffer);
+  for(int i=0;i<len;i++){
+    //Serial.print(write_buffer[i], DEC);
+    Serial1.write(write_buffer[i]);
+  }
+}
+//have to put output code here
+void parse_Packet(){
+  byte crc = calcSimpleCRC(read_buffer);
+  byte _crc = read_buffer[read_buffer[0]-1];
+  //Serial.println(_crc, DEC);
+  if(_crc == crc){
+    //Serial.println("match");
+    //Serial1.write(254);
+    writeBuffer();
+  } else {
+    Serial.println("err 255 CRC non match");
+    Serial1.write(255);
+  }
+  bufferOffset = 0;
+}
+
+//receive 1 bytes at a time
+void receivePacket(byte s1){
+  /*if(bufferOffset == 0)
+    Serial.print("len ");
+  Serial.print("byte: ");
+  Serial.println(s1, DEC);
+  Serial.print("bufferOffset: ");
+  Serial.println(bufferOffset, DEC);*/   
+  if(bufferOffset == 0 & s1 <= bufferLength ){
+    read_buffer[bufferOffset] = s1; //buffer[0] = packet length
+    bufferOffset += 1;
+  } else if(bufferOffset > 0){
+    if( (read_buffer[0]-1) >= bufferOffset){
+        read_buffer[bufferOffset] = s1;
+        bufferOffset += 1;
+    }
+    if(bufferOffset == read_buffer[0]){
+     parse_Packet(); 
+    }
+  }
+}
+
+
+
+/***************************************************************************************
+ * 
+ *  MAIN PROGRAM START
+ * 
+ ***************************************************************************************/
+
+//GLOBAL Variables
+#define ACS712_Vout_Pin A0
+#define max_amps 30
+
+#define VDIV_Vout_Pin A1
+#define VDIV_R1 100000
+#define VDIV_R2 9920
+#define VDIV_R3 9920
+//VDIV_R1+VDIV_R2 / VDIV_R3 = volt div ratio
+
+#define Vcc 5.0       //not LDO regulator produces 4.5v on USB power
+
+#define NumParallelCells 8
+#define NumSeriesCells 13
+#define CellLowVoltage 3.2
+#define CellHighVoltage 4.2
+#define SingleCellmAHCapacity 2900
+#define BMScuttoffV 41.6
+
+#define bt_state_pin 3
+#define start_byte 213
+//80% charge = 2320mah
+float AHCapacity = 0;
+//float WH = 0;
+double AH = 0;
+float MaxI = 0;
+boolean isDischarging = false;
+uint16_t cycle_count = 50;
+boolean charge_cycle_complete = false;
+
+
+void saveEEPROM(){
+  write_double_eeprom(AH, 0);
+  write_uint16_eeprom(cycle_count, 4);
+}
+
+void loadEEPROM(){
+  AH = read_double_eeprom(0);
+  cycle_count = read_uint16_eeprom(4);
+}
+
+/************** display code start ***********************************/
+#define LINE1 10
+#define LINE2 23
+#define LINE3 36
+#define LINE4 49
+#define LINE5 62
+
+
+#define STATUSBAR_WIDTH 126
+#define STATUSBAR_HEIGHT 12
+void drawSTATUSBAR(uint8_t x, uint8_t y, float percent){
+  u8g.drawFrame(x, y, STATUSBAR_WIDTH+x, STATUSBAR_HEIGHT);
+  uint8_t fill_width = (STATUSBAR_WIDTH-4) * percent;
+  u8g.drawBox(x+2, y+2, fill_width, STATUSBAR_HEIGHT-4);
+}
+
+void setupDisplay(){
+  u8g.begin();
+  // assign default color value
+  if ( u8g.getMode() == U8G_MODE_R3G3B2 ) {
+    u8g.setColorIndex(255);     // white
+  }
+  else if ( u8g.getMode() == U8G_MODE_GRAY2BIT ) {
+    u8g.setColorIndex(3);         // max intensity
+  }
+  else if ( u8g.getMode() == U8G_MODE_BW ) {
+    u8g.setColorIndex(1);         // pixel on
+  }
+  else if ( u8g.getMode() == U8G_MODE_HICOLOR ) {
+    u8g.setHiColorByRGB(255,255,255);
+  }
+}
+void updateDisplay(float I, float V){
+  u8g.firstPage();
+  do {
+    u8g.setFont(u8g_font_courB10);
+    
+    u8g.setPrintPos(0, LINE1);
+    u8g.print("V: ");
+    u8g.print(V);
+    
+    u8g.setPrintPos(0, LINE2);
+    u8g.print("I: ");
+    u8g.print(I);
+  
+    u8g.setPrintPos(0, LINE3);
+    u8g.print("MaxI: ");
+    u8g.print(MaxI);
+    
+    u8g.setPrintPos(0, LINE4);
+    u8g.print("AH: ");
+    u8g.print(AH);
+
+    //if(I<0) I *= -1;
+    //float perMaxI = I/30; //30a max sensor current
+    //drawSTATUSBAR(0, 52, perMaxI); //per max amps
+
+    float AH_Remaining = ((AHCapacity + AH)/AHCapacity); //AH is always negative when synced properly or 0 when full charge
+    drawSTATUSBAR(0, 52, AH_Remaining); //SHOW battery meter
+  } while ( u8g.nextPage() );  
+}
+
+void updateDisplayCharge(float I, float V){
+  u8g.firstPage();
+  do {
+    u8g.setFont(u8g_font_courB10);
+    
+    u8g.setPrintPos(0, LINE1);
+    u8g.print("V: ");
+    u8g.print(V);
+    
+    u8g.setPrintPos(0, LINE2);
+    u8g.print("I: ");
+    u8g.print(I);
+
+    float time_charge_hours = (AH*-1)/I;
+    u8g.setPrintPos(0, LINE3);
+    u8g.print("TimeH: ");
+    u8g.print(time_charge_hours);
+    
+    u8g.setPrintPos(0, LINE4);
+    u8g.print("AH: ");
+    u8g.print(AH);
+
+    //if(I<0) I *= -1;
+    //float perMaxI = I/30; //30a max sensor current
+    //drawSTATUSBAR(0, 52, perMaxI); //per max amps
+
+    float AH_Remaining = ((AHCapacity + AH)/AHCapacity); //AH is always negative when synced properly or 0 when full charge
+    drawSTATUSBAR(0, 52, AH_Remaining); //SHOW battery meter
+  } while ( u8g.nextPage() );  
+}
+
+
+
+void setup(){
+  pinMode(4, INPUT);      //bt reset pin
+  pinMode(5, INPUT);      //bt dc pin
+  pinMode(6, INPUT);      //bt dd pin
+  pinMode(bt_state_pin, INPUT);      //bt STATE pin
+  
+  delay(180);          //delay keeps screen from being random pixels
+  Serial.begin(115200); //serial seems to be one greater than specified, use 38400 for link on slave side if 19200 is set here
+  delay(20);          //allow serial port to stabilize 
+  setupDisplay();
+
+  AHCapacity = (NumParallelCells * SingleCellmAHCapacity) / 1000;
+  loadEEPROM();
+  //saveEEPROM();
+  while(!Serial){}
+}
+
+
+void loop(){
+	unsigned long start_time = millis();
+	get_bt_connected(bt_state_pin); //TEST IF CONNECTED
+  
+	//parse_Packet();
+	if(Serial.available()){
+	  byte s1 = Serial.read();
+	  if(s1 >= 0)
+		receivePacket(s1);
+	} 
+
+
+  uint16_t VDIV_Vout = analogRead(VDIV_Vout_Pin);
+  
+    // Convert the raw value being read from analog pin
+    uint16_t ACS712_Vout = analogRead(ACS712_Vout_Pin);
+/* ACS712ELC-30A Specs
+  66mV / A
+  5v operation
+  40 to 85 degC operation
+  35uS power on time
+  
+  vout = vcc/2 = no current
+  vout < vcc/2 = -current
+  vout > vcc/2 = +current
+  
+  (vout - (vcc/2)) / .066 = Imeasure
+*/  
+
+
+  float I = ((ACS712_Vout * (Vcc / 1023)) - (Vcc/2)) / .066; //5v vcc 10bit adc
+  AH = (I/18000)+AH; //100ms sample 1/.2 = 5 * 3600 = 18000
+
+  isDischarging = false;
+  if(I<0){
+    if(I*-1 > MaxI)
+      MaxI = I*-1;    
+    isDischarging = true;
+  } else if(I > MaxI){
+    MaxI = I;
+  }
+/*
+adc full scale = 0-5v
+
+100k + 9.92k = 109,920 = R2
+9.92k = R1
+
+9,920 / 109920 = 0.0902474526928675
+1/0.0902474526928675 = 11.08064516129033
+
+
+measure 54v in, 4.49v out
+54/4.49 = 12.02672605790646
+*/  
+  float V = (VDIV_Vout * (Vcc / 1023)) * 12.026726;          //5v vcc 10bit adc 
+  //float W = V * I;
+  //WH = (W/3600)+ WH;
+  if(I > 0 & V > 54 & !charge_cycle_complete){
+    cycle_count += 1;
+    charge_cycle_complete = true;
+    Serial.println("charge cycle complete");
+  }
+  //only count charges if discharged by at leasy 1% capacity
+  if(AH < -1.5 & V < 54){
+    charge_cycle_complete = false;
+  }
+  
+  if(!isDischarging & I >= .1)
+    updateDisplayCharge(I, V);
+  else
+    updateDisplay(I, V);          //150ms time
+    
+  Serial.print("V");  Serial.print(V);
+  Serial.print("I");  Serial.print(I);
+  Serial.print("AH");  Serial.print(AH);
+	//Serial.write(start_byte);
+	//Serial.write(7);
+	//Serial.write(V);
+	//Serial.write(I);
+	//Serial.write(AH);
+
+
+  if(V <= BMScuttoffV+.5) saveEEPROM();  //BMS will cut power soon save AH/CC
+  unsigned long end_time = millis();  
+  //Serial.print((end_time - start_time));
+  
+  delay(200 - (end_time - start_time)); 
+}
